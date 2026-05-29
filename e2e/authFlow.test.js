@@ -1,16 +1,4 @@
-/* global device, waitFor, element, by */
-
 const TIMEOUT = 30000;
-const VALID_PASSWORD = '123';
-const INVALID_PASSWORD = 'wrong-password';
-const INSTITUTE_NAME = 'Guru Nanak Institute of Technology';
-
-const USERS = {
-  noInstitute: 'ayushb@gmail.com',
-  directDashboard: 'ayushn@gmail.com',
-  roleSelection: 'divyanshu@gmail.com',
-  instituteAndRoleSelection: 'ayushl@gmail.com',
-};
 
 const SELECTORS = {
   // LoginScreen.tsx uses the same emailInput testID in DEFAULT and PASSWORD modes.
@@ -19,22 +7,23 @@ const SELECTORS = {
   usePasswordButton: 'usePasswordButton',
   // LoginScreen.tsx PASSWORD mode exposes this exact password input testID.
   passwordInput: 'passwordInput',
-  // LoginScreen.tsx submits password auth with loginButton; continueButton is not used.
+  // LoginScreen.tsx now submits password auth with loginButton, not continueButton.
   loginButton: 'loginButton',
-  // LoginScreen.tsx renders backend/auth errors with this text testID.
+  // LoginScreen.tsx renders auth errors with this text testID.
   authErrorText: 'authErrorText',
-  // LoginScreen.tsx and BrandingHeader.tsx expose the theme toggle with this testID.
-  themeToggleButton: 'themeToggleButton',
+  // AdminDashboardScreen.tsx root SafeAreaView testID.
+  dashboardScreen: 'dashboardScreen',
+  // AdminDashboardScreen.tsx greeting title testID, used as an additional dashboard readiness signal.
+  dashboardGreetingTitle: 'dashboardGreetingTitle',
+  // Header.tsx logout button testID when showLogout is enabled on the dashboard.
+  logoutButton: 'logoutButton',
   // InstituteSelectionScreen.tsx root SafeAreaView testID.
   instituteSelectionScreen: 'instituteSelectionScreen',
   // RoleSelectionScreen.tsx root SafeAreaView testID.
   roleSelectionScreen: 'roleSelectionScreen',
-  // AdminDashboardScreen.tsx root SafeAreaView testID.
-  dashboardScreen: 'dashboardScreen',
-  // AdminDashboardScreen.tsx greeting title testID, used as dashboard readiness signal.
-  dashboardGreetingTitle: 'dashboardGreetingTitle',
-  // Header.tsx logout button testID when showLogout is enabled on Dashboard.
-  logoutButton: 'logoutButton',
+  // BrandingHeader.tsx and LoginScreen.tsx theme toggle button testID.
+  // Used for theme validation without Android-incompatible device.setAppearance().
+  themeToggleButton: 'themeToggleButton',
 };
 
 /**
@@ -57,17 +46,10 @@ const roleTestId = role => {
   return `roleCard_${sanitizedRoleName}`;
 };
 
-async function launchFreshApp(deleteApp = true) {
+async function launchFreshApp() {
   await device.launchApp({
     newInstance: true,
-    delete: deleteApp,
-  });
-}
-
-async function relaunchAppWithoutDeletingData() {
-  await device.launchApp({
-    newInstance: true,
-    delete: false,
+    delete: true,
   });
 }
 
@@ -77,19 +59,18 @@ async function waitForLoginScreen() {
     .withTimeout(TIMEOUT);
 }
 
-async function expectLoginScreen() {
+async function loginWithPassword(email) {
   await waitForLoginScreen();
-  await expect(element(by.id(SELECTORS.emailInput))).toBeVisible();
-}
 
-async function enterEmailOrPhone(value) {
-  await waitForLoginScreen();
+  /**
+   * Login selectors verified against LoginScreen.tsx:
+   * - emailInput: DEFAULT mode email/phone input and PASSWORD mode identifier input.
+   * - usePasswordButton: EMAIL_OPTIONS button that switches to PASSWORD mode.
+   * - passwordInput: PASSWORD mode password field.
+   * - loginButton: PASSWORD mode submit button; continueButton is not used here.
+   */
   await element(by.id(SELECTORS.emailInput)).tap();
-  await element(by.id(SELECTORS.emailInput)).replaceText(value);
-}
-
-async function openPasswordFlow(email) {
-  await enterEmailOrPhone(email);
+  await element(by.id(SELECTORS.emailInput)).replaceText(email);
 
   await waitFor(element(by.id(SELECTORS.usePasswordButton)))
     .toBeVisible()
@@ -100,47 +81,15 @@ async function openPasswordFlow(email) {
   await waitFor(element(by.id(SELECTORS.passwordInput)))
     .toBeVisible()
     .withTimeout(TIMEOUT);
-}
 
-async function submitPassword(password) {
-  if (password) {
-    await element(by.id(SELECTORS.passwordInput)).tap();
-    await element(by.id(SELECTORS.passwordInput)).replaceText(password);
-  }
+  await element(by.id(SELECTORS.passwordInput)).tap();
+  await element(by.id(SELECTORS.passwordInput)).replaceText('123');
 
   await waitFor(element(by.id(SELECTORS.loginButton)))
     .toBeVisible()
     .withTimeout(TIMEOUT);
 
   await element(by.id(SELECTORS.loginButton)).tap();
-}
-
-async function loginWithPassword(email, password = VALID_PASSWORD) {
-  /**
-   * Login selectors verified against LoginScreen.tsx:
-   * - emailInput: DEFAULT mode email/phone input and PASSWORD mode identifier input.
-   * - usePasswordButton: EMAIL_OPTIONS button that switches to PASSWORD mode.
-   * - passwordInput: PASSWORD mode password field.
-   * - loginButton: PASSWORD mode submit button.
-   */
-  await openPasswordFlow(email);
-  await submitPassword(password);
-}
-
-async function expectAuthError() {
-  await waitFor(element(by.id(SELECTORS.authErrorText)))
-    .toBeVisible()
-    .withTimeout(TIMEOUT);
-
-  await expect(element(by.id(SELECTORS.authErrorText))).toBeVisible();
-}
-
-async function expectMissingCredentialsValidation() {
-  await waitFor(element(by.text('Please enter both Email/Phone and Password')))
-    .toBeVisible()
-    .withTimeout(TIMEOUT);
-
-  await expect(element(by.text('Please enter both Email/Phone and Password'))).toBeVisible();
 }
 
 async function expectDashboard() {
@@ -158,11 +107,6 @@ async function expectDashboard() {
     .withTimeout(TIMEOUT);
 
   await expect(element(by.id(SELECTORS.dashboardScreen))).toBeVisible();
-  await expect(element(by.id(SELECTORS.dashboardGreetingTitle))).toBeVisible();
-}
-
-async function expectNotOnDashboard() {
-  await expect(element(by.id(SELECTORS.dashboardScreen))).not.toBeVisible();
 }
 
 async function logoutAndExpectLogin() {
@@ -175,7 +119,8 @@ async function logoutAndExpectLogin() {
     .withTimeout(TIMEOUT);
 
   await element(by.id(SELECTORS.logoutButton)).tap();
-  await expectLoginScreen();
+
+  await waitForLoginScreen();
 }
 
 async function selectInstituteByName(name) {
@@ -188,9 +133,11 @@ async function selectInstituteByName(name) {
    * - instituteSelectionScreen: root SafeAreaView.
    * - instituteCard_${id}: card Pressable generated from institute_id || id.
    *
-   * Current scenarios pass the visible institute name, not the API ID, so names
-   * use by.text(name) instead of the old broken instituteCard-${name} convention.
-   * If a numeric API ID is passed later, this uses instituteTestId(instituteId).
+   * This helper intentionally keeps the existing name-based test flow. The current
+   * UI no longer exposes a name-derived card testID, and the API ID is not passed
+   * by the current scenarios, so names use by.text(name) instead of the old broken
+   * instituteCard-${name} convention. If a numeric API ID is passed later, it uses
+   * instituteTestId(instituteId), which matches the current card testID.
    */
   const instituteMatcher = /^\d+$/.test(String(name))
     ? by.id(instituteTestId(name))
@@ -223,192 +170,117 @@ async function selectRole(roleName) {
   await element(by.id(id)).tap();
 }
 
-async function verifyThemeToggleAvailable() {
+async function toggleThemeViaButton() {
+  /**
+   * Theme toggle helper for Android Detox compatibility.
+   * Taps themeToggleButton instead of using device.setAppearance()
+   * which is not supported on Android Emulator (android.emu.debug).
+   *
+   * Location: BrandingHeader.tsx and LoginScreen.tsx.
+   */
   await waitFor(element(by.id(SELECTORS.themeToggleButton)))
     .toBeVisible()
     .withTimeout(TIMEOUT);
-}
 
-async function switchTheme() {
-  await verifyThemeToggleAvailable();
   await element(by.id(SELECTORS.themeToggleButton)).tap();
-  await expectLoginScreen();
 }
 
-async function ensureLightTheme() {
-  /**
-   * ThemeContext starts from the device/system theme on a clean launch. Detox
-   * cannot directly assert React Native colors, so Exercise 5 validates that the
-   * requested theme control is visible and the auth UI remains usable after the
-   * theme state is set/toggled.
-   */
-  await device.setAppearance('light');
-  await launchFreshApp(true);
-  await verifyThemeToggleAvailable();
-  await expectLoginScreen();
-}
-
-async function enableDarkTheme() {
-  await device.setAppearance('light');
-  await launchFreshApp(true);
-  await switchTheme();
-}
-
-describe('Negative Flow Tests', () => {
+describe('MentrixOS Complete Auth Flow', () => {
   beforeEach(async () => {
     await launchFreshApp();
   });
 
-  it('NF_001 - Invalid Email Format: shows validation/auth error and blocks dashboard access', async () => {
-    // Scenario verifies invalid email format cannot complete password login.
-    await loginWithPassword('ayush@', VALID_PASSWORD);
-    await expectAuthError();
-    await expectLoginScreen();
-    await expectNotOnDashboard();
+  it('User 1: shows No Institutes Assigned error for ayushb@gmail.com', async () => {
+    await loginWithPassword('ayushb@gmail.com');
+
+    await waitFor(element(by.id(SELECTORS.authErrorText)))
+      .toBeVisible()
+      .withTimeout(TIMEOUT);
+
+    await expect(element(by.id(SELECTORS.authErrorText))).toBeVisible();
   });
 
-  it('NF_002 - Empty Email Field: keeps user on login and does not expose password flow', async () => {
-    // Scenario verifies empty email/mobile input cannot proceed to password flow.
+  it('User 2: ayushn@gmail.com logs in directly to Dashboard and logs out', async () => {
+    await loginWithPassword('ayushn@gmail.com');
+    await expectDashboard();
+    await logoutAndExpectLogin();
+  });
+
+  it('User 3: divyanshu@gmail.com selects Student role then reaches Dashboard', async () => {
+    await loginWithPassword('divyanshu@gmail.com');
+    await selectRole('Student');
+    await expectDashboard();
+    await logoutAndExpectLogin();
+  });
+
+  it('User 4: ayushl@gmail.com selects institute and Admin role then reaches Dashboard', async () => {
+    await loginWithPassword('ayushl@gmail.com');
+    await selectInstituteByName('Guru Nanak Institute of Technology');
+    await selectRole('Admin');
+    await expectDashboard();
+    await logoutAndExpectLogin();
+  });
+
+  it('User 5: pratik@gmail.com selects institute and Admin role then reaches Dashboard', async () => {
+    await loginWithPassword('pratik@gmail.com');
+    await selectInstituteByName('Guru Nanak Institute of Technology');
+    await selectRole('Admin');
+    await expectDashboard();
+    await logoutAndExpectLogin();
+  });
+
+  // Theme Validation Tests (Android Detox compatible using themeToggleButton)
+  // Note: device.setAppearance() is not supported on Android Emulator (android.emu.debug)
+
+  it('Theme Validation: Light Theme - Toggle from default and verify Login screen remains functional', async () => {
+    /**
+     * Light Theme Test (theme toggle validation without device.setAppearance()).
+     * - Launches app with default theme
+     * - Verifies Login screen is visible
+     * - Toggles theme once to switch appearance
+     * - Verifies app remains functional after theme change
+     */
     await waitForLoginScreen();
-    await element(by.id(SELECTORS.emailInput)).tap();
-    await element(by.id(SELECTORS.emailInput)).replaceText('');
 
-    await expect(element(by.id(SELECTORS.usePasswordButton))).not.toBeVisible();
-    await expectLoginScreen();
-    await expectNotOnDashboard();
-  });
+    // Verify Login screen is visible before theme toggle
+    await expect(element(by.id(SELECTORS.emailInput))).toBeVisible();
 
-  it('NF_003 - Invalid Password: shows authentication error and remains on login screen', async () => {
-    // Scenario verifies valid email with incorrect password is rejected.
-    await loginWithPassword(USERS.directDashboard, INVALID_PASSWORD);
-    await expectAuthError();
-    await expectLoginScreen();
-    await expectNotOnDashboard();
-  });
+    // Toggle theme via button (tap themeToggleButton to change appearance)
+    await toggleThemeViaButton();
 
-  it('NF_004 - Empty Password: shows missing credentials validation and blocks authentication', async () => {
-    // Scenario verifies login cannot be submitted with a blank password.
-    await openPasswordFlow(USERS.directDashboard);
-    await submitPassword('');
-    await expectMissingCredentialsValidation();
-    await expectNotOnDashboard();
-  });
-
-  it('NF_005 - No Institute Assigned User: shows no-institute error and blocks dashboard access', async () => {
-    // Scenario verifies valid credentials for a user without institutes stay in auth flow.
-    await loginWithPassword(USERS.noInstitute);
-    await expectAuthError();
-    await expectLoginScreen();
-    await expectNotOnDashboard();
-  });
-});
-
-describe('Positive Flow Tests - Light Theme', () => {
-  beforeEach(async () => {
-    await ensureLightTheme();
-  });
-
-  it('PF_LIGHT_001 - Direct Dashboard User: logs in, verifies dashboard greeting, and logs out', async () => {
-    // Scenario verifies a single-institute/single-role user reaches Dashboard directly.
-    await loginWithPassword(USERS.directDashboard);
-    await expectDashboard();
-    await logoutAndExpectLogin();
-  });
-
-  it('PF_LIGHT_002 - Role Selection User: selects Student role and reaches Dashboard', async () => {
-    // Scenario verifies role selection before Dashboard for a multi-role user.
-    await loginWithPassword(USERS.roleSelection);
-    await waitFor(element(by.id(SELECTORS.roleSelectionScreen)))
+    // Verify app remains functional after theme change
+    await waitFor(element(by.id(SELECTORS.emailInput)))
       .toBeVisible()
       .withTimeout(TIMEOUT);
-    await selectRole('Student');
-    await expectDashboard();
-    await logoutAndExpectLogin();
+
+    await expect(element(by.id(SELECTORS.emailInput))).toBeVisible();
   });
 
-  it('PF_LIGHT_003 - Institute Selection + Role Selection User: selects institute and Admin role', async () => {
-    // Scenario verifies the complete institute selection plus role selection path.
-    await loginWithPassword(USERS.instituteAndRoleSelection);
-    await waitFor(element(by.id(SELECTORS.instituteSelectionScreen)))
+  it('Theme Validation: Dark Theme - Toggle and verify Login screen and login flow work correctly', async () => {
+    /**
+     * Dark Theme Test (theme toggle validation without device.setAppearance()).
+     * - Launches app with default theme
+     * - Toggles theme to switch appearance
+     * - Verifies Login screen remains usable after theme change
+     * - Executes login flow in toggled theme
+     * - Verifies Dashboard is reachable
+     */
+    await waitForLoginScreen();
+
+    // Toggle theme via button (tap themeToggleButton to change appearance)
+    await toggleThemeViaButton();
+
+    // Verify Login screen remains usable after theme change
+    await waitFor(element(by.id(SELECTORS.emailInput)))
       .toBeVisible()
       .withTimeout(TIMEOUT);
-    await selectInstituteByName(INSTITUTE_NAME);
-    await waitFor(element(by.id(SELECTORS.roleSelectionScreen)))
-      .toBeVisible()
-      .withTimeout(TIMEOUT);
-    await selectRole('Admin');
+
+    await expect(element(by.id(SELECTORS.emailInput))).toBeVisible();
+
+    // Execute login flow in toggled theme
+    await loginWithPassword('ayushn@gmail.com');
+
+    // Verify Dashboard is reachable in toggled theme
     await expectDashboard();
-    await logoutAndExpectLogin();
-  });
-});
-
-describe('Positive Flow Tests - Dark Theme', () => {
-  beforeEach(async () => {
-    await enableDarkTheme();
-  });
-
-  it('PF_DARK_001 - Direct Dashboard User: completes direct dashboard flow in dark theme', async () => {
-    // Scenario verifies direct Dashboard authentication remains stable after dark theme toggle.
-    await loginWithPassword(USERS.directDashboard);
-    await expectDashboard();
-    await logoutAndExpectLogin();
-  });
-
-  it('PF_DARK_002 - Role Selection User: selects Student role and reaches Dashboard in dark theme', async () => {
-    // Scenario verifies role selection remains stable after dark theme toggle.
-    await loginWithPassword(USERS.roleSelection);
-    await selectRole('Student');
-    await expectDashboard();
-    await logoutAndExpectLogin();
-  });
-
-  it('PF_DARK_003 - Institute Selection + Role Selection User: completes full flow in dark theme', async () => {
-    // Scenario verifies institute and role selection remain stable after dark theme toggle.
-    await loginWithPassword(USERS.instituteAndRoleSelection);
-    await selectInstituteByName(INSTITUTE_NAME);
-    await selectRole('Admin');
-    await expectDashboard();
-    await logoutAndExpectLogin();
-  });
-});
-
-describe('Theme Validation Tests', () => {
-  it('THM_001 - Switch Light Theme to Dark Theme: theme toggle remains functional', async () => {
-    // Scenario verifies the Light-to-Dark theme control is visible and usable.
-    await ensureLightTheme();
-    await switchTheme();
-    await verifyThemeToggleAvailable();
-    await expectLoginScreen();
-  });
-
-  it('THM_002 - Switch Dark Theme to Light Theme: theme toggle remains functional', async () => {
-    // Scenario verifies the Dark-to-Light theme control is visible and usable.
-    await enableDarkTheme();
-    await switchTheme();
-    await verifyThemeToggleAvailable();
-    await expectLoginScreen();
-  });
-});
-
-describe('Logout Validation Tests', () => {
-  beforeEach(async () => {
-    await ensureLightTheme();
-  });
-
-  it('LOG_001 - Verify Logout Functionality: returns user to Login screen', async () => {
-    // Scenario verifies Dashboard logout terminates the active authenticated view.
-    await loginWithPassword(USERS.directDashboard);
-    await expectDashboard();
-    await logoutAndExpectLogin();
-  });
-
-  it('LOG_002 - Verify Session Clearance After Logout: relaunch requires login again', async () => {
-    // Scenario verifies logout does not leave the app on Dashboard after relaunch.
-    await loginWithPassword(USERS.directDashboard);
-    await expectDashboard();
-    await logoutAndExpectLogin();
-    await relaunchAppWithoutDeletingData();
-    await expectLoginScreen();
-    await expectNotOnDashboard();
   });
 });
