@@ -8,6 +8,10 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
+    "api:test": "jest --config automation/tests/api.jest.config.js",
+    "api:seed": "node automation/scripts/seed.js",
+    "api:cleanup": "node automation/scripts/cleanup.js",
+    "api:reset-db": "node automation/scripts/reset-db.js",
 
     "detox:build-debug": "detox build --configuration android.emu.debug",
     "detox:test-debug": "detox test --configuration android.emu.debug",
